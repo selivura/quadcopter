@@ -8,7 +8,7 @@ public class PauseController : MonoBehaviour
     public static void Pause(bool value = true)
     {
         if(value)
-        Time.timeScale = 0;
+            Time.timeScale = 0;
         if (!value)
             Time.timeScale = 1;
 

@@ -9,14 +9,16 @@ public class QuadcopterController : MonoBehaviour
     public Propeller propellerFL;
     public Propeller propellerBL;
     public Propeller propellerBR;
-    public DroneInputs Inputs;
+
+    public float propellerForceFR;
+    public float propellerForceFL;
+    public float propellerForceBR;
+    public float propellerForceBL;
     //Quadcopter parameters
     [Header("Internal")]
     public float maxPropellerForce = 100; //100
     public float maxTorque = 1; //1
-    public float throttle = 0;
-    public int Score;
-    public int RestartAmount;
+    private float _throttle = 0;
 
     public float moveFactor = 5; //5
     //PID
@@ -26,12 +28,6 @@ public class QuadcopterController : MonoBehaviour
     public Vector3 PID_throttleGains = new Vector3(1, 0, 0); //(1, 0, 0)
     [SerializeField] private float _maxThorttle = 200;
 
-    //External parameters
-    [Header("External")]
-    public float windForce;
-    //0 -> 360
-    public float forceDir;
-
     Rigidbody _quadcopterRB;
 
     //The PID controllers
@@ -39,122 +35,114 @@ public class QuadcopterController : MonoBehaviour
     private PIDController PID_roll;
     private PIDController PID_yaw;
     private PIDController PID_throttle;
-    [SerializeField] private PhysicsVisualizer _visualizer;
     //Movement factors
     float _pitch;
     float _roll;
     float _yawDir;
     float _targetHeight;
     bool _dirtyPos = false;
-    public Transform lastSpawnpoint;
-    public Transform NextCheckpoint;
-    private Map _map ;
-    public void PassCheckpoint(int value)
-    {
-        Score += value; 
-        NextCheckpoint = _map.GetNextCheckpoint(this);
-    }
+
+    public float Pitch { get => _pitch; set => _pitch = value; }
+    public float Roll { get => _roll; set => _roll = value; }
+    public float YawDir { get => _yawDir; set => _yawDir = value; }
+    public float TargetHeight { get => _targetHeight; set => _targetHeight = value; }
+    public float Throttle { get => _throttle; set => _throttle = value; }
+
+    public Action onDeath;
+    bool _reset = false;
+   
     void Awake()
     {
-        _visualizer = GetComponent<PhysicsVisualizer>();
         _quadcopterRB = GetComponent<Rigidbody>();
         PID_pitch = new PIDController();
         PID_roll = new PIDController();
         PID_yaw = new PIDController();
         PID_throttle = new PIDController();
-        Inputs.onReset += () => ResetDrone();
-        _map = FindObjectOfType<Map>();
-        lastSpawnpoint = FindAnyObjectByType<PlayerSpawner>().GetSpawnPoint();
-        if (_map)
-            NextCheckpoint = _map.GetNextCheckpoint(this);
         ResetDrone(false);
     }
 
-    private void ResetDrone(bool countAsDeath = true)
+    public void ResetDrone(bool countAsDeath = true)
     {
-        transform.position = lastSpawnpoint.position;
-        transform.rotation = lastSpawnpoint.rotation;
         _quadcopterRB.velocity = Vector3.zero;
         _quadcopterRB.angularVelocity = Vector3.zero;
         propellerBL.health = 100;
         propellerBR.health = 100;
         propellerFL.health = 100;
         propellerFR.health = 100;
-        _targetHeight = transform.position.y;
-        if(countAsDeath)
-        RestartAmount++;
+        SetTargetHeight(transform.position.y);
+         _pitch = 0;
+        _yawDir = 0;
+        _roll = 0;
+        _reset = true;
+        if (countAsDeath)
+            onDeath?.Invoke();
     }
 
     void FixedUpdate()
     {
-        AddControls();
         AddMotorForce();
     }
-
-    void AddControls()
+    public void SetTargetHeight(float value)
     {
-        if (Mathf.Abs(Inputs.Throttle) > 0)
+        if (Mathf.Abs(value) > 0)
         {
-            _targetHeight += Inputs.Throttle;
+            TargetHeight += value;
             _dirtyPos = true;
         }
         else if (_dirtyPos)
         {
-            _targetHeight = transform.position.y;
+            TargetHeight = transform.position.y;
             _dirtyPos = false;
         }
-        throttle += PID_throttle.GetFactorFromPIDController(PID_throttleGains, GetHeightError());
-        throttle = Mathf.Clamp(throttle, 0, _maxThorttle);
-
-        _pitch = 0f;
-        _pitch = Inputs.Pitch;
-
-        _roll = 0f;
-        _roll = Inputs.Roll;
-
-        _yawDir = 0f;
-        _yawDir = Inputs.Yaw;
+        _throttle += PID_throttle.GetFactorFromPIDController(PID_throttleGains, GetHeightError());
+        _throttle = Mathf.Clamp(_throttle, 0, _maxThorttle);
     }
+
     void AddMotorForce()
     {
+        if (_reset)
+        {
+            _reset = false;
+            return;
+        }
         //Pitch
         float pitchError = GetPitchError();
 
         //Roll
         float rollError = GetRollError() * -1f;
 
-        Vector3 PID_pitch_gains_adapted = throttle > 100f ? PID_pitch_gains * 2f : PID_pitch_gains;
+        Vector3 PID_pitch_gains_adapted = _throttle > 100f ? PID_pitch_gains * 2f : PID_pitch_gains;
 
         float PID_pitch_output = PID_pitch.GetFactorFromPIDController(PID_pitch_gains_adapted, pitchError);
         float PID_roll_output = PID_roll.GetFactorFromPIDController(PID_roll_gains, rollError);
 
         //FR
-        float propellerForceFR = throttle + (PID_pitch_output + PID_roll_output);
+        propellerForceFR = _throttle + (PID_pitch_output + PID_roll_output);
 
         //Add steering
-        propellerForceFR -= _pitch * throttle * moveFactor;
-        propellerForceFR -= _roll * throttle;
+        propellerForceFR -= Pitch * _throttle * moveFactor;
+        propellerForceFR -= Roll * _throttle;
         propellerForceFR *= propellerFR.health / 100;
 
         //FL
-        float propellerForceFL = throttle + (PID_pitch_output - PID_roll_output);
+        propellerForceFL = _throttle + (PID_pitch_output - PID_roll_output);
 
-        propellerForceFL -= _pitch * throttle * moveFactor;
-        propellerForceFL += _roll * throttle;
+        propellerForceFL -= Pitch * _throttle * moveFactor;
+        propellerForceFL += Roll * _throttle;
         propellerForceFL *= propellerFL.health / 100;
 
         //BR
-        float propellerForceBR = throttle + (-PID_pitch_output + PID_roll_output);
+        propellerForceBR = _throttle + (-PID_pitch_output + PID_roll_output);
 
-        propellerForceBR += _pitch * throttle * moveFactor;
-        propellerForceBR -= _roll * throttle;
+        propellerForceBR += Pitch * _throttle * moveFactor;
+        propellerForceBR -= Roll * _throttle;
         propellerForceBR *= propellerBR.health / 100;
 
         //BL 
-        float propellerForceBL = throttle + (-PID_pitch_output - PID_roll_output);
+        propellerForceBL = _throttle + (-PID_pitch_output - PID_roll_output);
 
-        propellerForceBL += _pitch * throttle * moveFactor;
-        propellerForceBL += _roll * throttle;
+        propellerForceBL += Pitch * _throttle * moveFactor;
+        propellerForceBL += Roll * _throttle;
         propellerForceBL *= propellerBL.health / 100;
         
         //Clamp
@@ -163,7 +151,6 @@ public class QuadcopterController : MonoBehaviour
         propellerForceBR = Mathf.Clamp(propellerForceBR, 0f, maxPropellerForce);
         propellerForceBL = Mathf.Clamp(propellerForceBL, 0f, maxPropellerForce);
 
-        _visualizer.Visualize(propellerForceFR, propellerForceFL, propellerForceBL, propellerForceBR, Inputs.EnbleVisual);
 
         propellerFR.RotationSpeed = propellerForceFR;
         propellerFL.RotationSpeed = propellerForceFL;
@@ -177,8 +164,8 @@ public class QuadcopterController : MonoBehaviour
         float yawError = _quadcopterRB.angularVelocity.y;
         float propHealthFactor = ((propellerFL.health + propellerBL.health + propellerFR.health + propellerBR.health) / 4) / 100;
         float PID_yaw_output = PID_yaw.GetFactorFromPIDController(PID_yaw_gains, yawError) * propHealthFactor;
-        _quadcopterRB.AddTorque(transform.up * _yawDir * maxTorque * throttle * propHealthFactor);
-        _quadcopterRB.AddTorque(transform.up * throttle * PID_yaw_output * -1f);
+        _quadcopterRB.AddTorque(transform.up * YawDir * maxTorque * _throttle * propHealthFactor);
+        _quadcopterRB.AddTorque(transform.up * _throttle * PID_yaw_output * -1f);
     }
 
     void AddForceToPropeller(GameObject propellerObj, float propellerForce)
@@ -186,10 +173,8 @@ public class QuadcopterController : MonoBehaviour
         Vector3 propellerUp = propellerObj.transform.up;
         Vector3 propellerPos = propellerObj.transform.position;
         _quadcopterRB.AddForceAtPosition(propellerUp * propellerForce, propellerPos);
-
         //Debug.DrawRay(propellerPos, propellerUp * 1f, Color.red);
     }
-
     private float GetPitchError()
     {
         float xAngle = transform.eulerAngles.x;
@@ -223,14 +208,14 @@ public class QuadcopterController : MonoBehaviour
 
     private float GetHeightError()
     {
-        float height = _targetHeight - transform.position.y;
+        float height = TargetHeight - transform.position.y;
         return height;
     }
 
     //Wrap between 0 and 360 degrees
     float WrapAngle(float inputAngle)
     {
-        return ((inputAngle % 360f) + 360f) % 360f;
+        return inputAngle % 360f;
     }
 }
 public class PIDController

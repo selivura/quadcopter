@@ -59,6 +59,11 @@ public class QuadracopterCameraMode : MonoBehaviour
             CamReset();
         }
     }
+    private void OnDestroy()
+    {
+        Destroy(_cam.gameObject);
+        Destroy(_vcam.gameObject);
+    }
     private void CamReset()
     {
         _cam.transform.localPosition = Vector3.zero;

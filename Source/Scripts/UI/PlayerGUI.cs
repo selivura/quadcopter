@@ -12,17 +12,16 @@ public class PlayerGUI : MonoBehaviour
     [SerializeField] TMP_Text _FLStateText;
     [SerializeField] TMP_Text _BRStateText;
     [SerializeField] TMP_Text _BLStateText;
-    [SerializeField] TMP_Text _PIDpitch;
-    [SerializeField] TMP_Text _PIDyaw;
-    [SerializeField] TMP_Text _PIDroll;
-    [SerializeField] TMP_Text _PIDHeight;
     [SerializeField] TMP_Text _scoreText;
     public QuadcopterController Copter;
+    private CopterScore _score;
     private int _playerId = 0;
     public void Initialize(int playerId)
     {
         _playerId = playerId;
+        if(_playerIdText)
         _playerIdText.text = "Player " + _playerId;
+        _score = Copter.GetComponent<CopterScore>();
     }
     private void Update()
     {
@@ -34,11 +33,7 @@ public class PlayerGUI : MonoBehaviour
         _FLStateText.text = "FL\n" + Copter.propellerFL.health;
         _BRStateText.text = "BR\n" + Copter.propellerBR.health;
         _BLStateText.text = "BL\n" + Copter.propellerBL.health;
-        _PIDpitch.text = "P" + Copter.PID_pitch_gains.ToString("F1");
-        _PIDyaw.text = "Y" + Copter.PID_yaw_gains.ToString("F1");
-        _PIDroll.text = "R" + Copter.PID_roll_gains.ToString("F1");
-        _PIDHeight.text = "T" + Copter.PID_throttleGains.ToString("F1");
-        _throttleText.text = "Throttle: " + Copter.throttle.ToString("F1");
-        _scoreText.text = "Score: " + Copter.Score.ToString();
+        _throttleText.text = "THROTTLE: " + Copter.Throttle.ToString("F1");
+        _scoreText.text = _score.Score.ToString();
     }
 }

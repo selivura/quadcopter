@@ -12,6 +12,11 @@ public class LevelEnd : MonoBehaviour
         {           
             Destroy(Instantiate(_checkParticle, transform), 3);
             FindObjectOfType<PlayerSpawner>().WinGame();
+            copter.GetComponent<AudioSource>().enabled = false;
+            foreach (var source in  copter.GetComponentsInChildren<AudioSource>() )
+            {
+                source.enabled = false;
+            }   
         }
     }
 }

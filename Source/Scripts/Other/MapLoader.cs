@@ -5,19 +5,20 @@ using UnityEngine.SceneManagement;
 
 public class MapLoader : MonoBehaviour
 {
+    //Все сцены уровней должны идити строго после MainMenu
+    //Сцена главного меню должна идити строго после MainScene
+    public static int CurrentLevel { get; private set; } = -1; //-1 со старта, чтобы не выгрузить случайно главную сцену
+    public static System.Action onLevelLoaded;
     public static void LoadLevel(int level)
     {
-        SceneManager.LoadScene("MainScene");
-        SceneManager.LoadScene(level + 1, LoadSceneMode.Additive);
-    }
-    public static void LoadLevel(string level)
-    {
-        SceneManager.LoadScene("MainScene");
-        SceneManager.LoadScene(level, LoadSceneMode.Additive);
-    }
-    public static void LoadMainMenu()
-    {
-        SceneManager.LoadScene("MainMenu");
+        var actualLevel = level + 1;
+        if (level == -1)
+            throw new System.Exception("Нельзя выгрузить главную сцену!");
+        if (CurrentLevel != -1)
+            SceneManager.UnloadSceneAsync(CurrentLevel);
+        SceneManager.LoadScene(actualLevel, LoadSceneMode.Additive);
+        CurrentLevel = actualLevel;
+        onLevelLoaded?.Invoke();
     }
 
 }

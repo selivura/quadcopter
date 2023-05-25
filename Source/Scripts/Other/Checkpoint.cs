@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 
 public class Checkpoint : MonoBehaviour
 {
@@ -8,6 +9,7 @@ public class Checkpoint : MonoBehaviour
     [SerializeField] GameObject _checkParticle;
     [SerializeField] Transform _spawnPoint;
     [SerializeField] int _cost = 1000;
+    public UnityEvent onCheckpoint;
     public bool CheckIfCompleted(QuadcopterController copter)
     {
         return _checkedCopters.Contains(copter);
@@ -15,14 +17,19 @@ public class Checkpoint : MonoBehaviour
     private void OnTriggerEnter(Collider other)
     {
         var copter = other.GetComponent<QuadcopterController>();
-        if(copter)
+        if (copter)
         {
             if (_checkedCopters.Contains(copter))
                 return;
             _checkedCopters.Add(copter);
             Destroy(Instantiate(_checkParticle, transform), 3);
-            copter.lastSpawnpoint = _spawnPoint;
-            copter.PassCheckpoint(_cost);
+            var player = copter.GetComponent<CopterScore>();
+            if (player)
+            {
+                player.LastSpawnpoint = _spawnPoint;
+                player.PassCheckpoint(_cost);
+                onCheckpoint?.Invoke();
+            }
         }
     }
 }

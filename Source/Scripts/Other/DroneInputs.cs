@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(PlayerInput))]
+[RequireComponent(typeof(QuadcopterController))]
 public class DroneInputs : MonoBehaviour
 {
     private float _pitch;
@@ -17,16 +18,32 @@ public class DroneInputs : MonoBehaviour
     public float Yaw { get => _yaw; set => _yaw = value; }
     public float Roll { get => _roll; set => _roll = value; }
     public float Throttle { get => _throttle; set => _throttle = value; }
-    public bool EnbleVisual { get => _enbleVisual; set => _enbleVisual = value; }
-    public bool EnableDirection { get => _enableDirection; set => _enableDirection = value; }
 
     public Action onReset;
     public Action onRequestPause;
-    private PlayerInput _input;
     private QuadcopterController _controller;
+    private PhysicsVisualizer _visualizer;
+    private CheckpointDirection _checkpointDirection;
     private void Start()
     {
         _controller = GetComponent<QuadcopterController>();
+        _visualizer = GetComponent<PhysicsVisualizer>();
+        _checkpointDirection = GetComponent<CheckpointDirection>();
+    }
+    private void FixedUpdate()
+    {
+        AddControls();
+    }
+    
+    void AddControls()
+    {
+        _controller.SetTargetHeight(Throttle);
+
+        _controller.Pitch = Pitch;
+
+        _controller.Roll = Roll;
+
+        _controller.YawDir = Yaw;
     }
     public void OnPause(InputValue value)
     {
@@ -50,19 +67,21 @@ public class DroneInputs : MonoBehaviour
     }
     public void OnResetDrone()
     {
-        onReset?.Invoke();
+        _controller.ResetDrone();
     }
     public void OnToggleVisualization()
     {
         _enbleVisual = !_enbleVisual;
+        _visualizer.EnableVisualisation = _enbleVisual;
     }
     public void OnToggleDirection()
     {
         _enableDirection = !_enableDirection;
+        _checkpointDirection.Enable = _enableDirection;
     }
     public void OnToggleGUI()
     {
-        FindObjectOfType<UISetuper>().ToggleGUI(_controller.PlayerID);
+        FindObjectOfType<IngameMenu>().ToggleGUI(_controller.PlayerID);
     }
     private void OnDestroy()
     {
